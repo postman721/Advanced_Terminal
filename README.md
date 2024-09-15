@@ -2,6 +2,8 @@
 
 An advanced terminal emulator application built with PySide2 and Python, featuring syntax highlighting and a tabbed interface with customizable functionality.
 
+![terminal](https://github.com/user-attachments/assets/b0a2fa36-7c09-46a4-b010-eca2ae78bce8)
+
 ## Features
 
 - **Tabbed Interface**: Manage multiple terminal sessions in tabs.
