@@ -124,7 +124,7 @@ To run this application, you need Python 3 and PySide2 installed. You can set up
   chmod +x advanced_terminal.py
   python3 advanced_terminal.py
 
-    Use the GUI to manage terminal tabs, execute commands, and utilize features like syntax highlighting and split view.
+Use the GUI to manage terminal tabs, execute commands, and utilize features like syntax highlighting and split view.
 
 Creating a New Tab
 
