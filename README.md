@@ -11,7 +11,9 @@ An advanced terminal emulator application built with PySide2 and Python, featuri
 - **Double-Click to Create New Tab**: Easily add new terminal tabs with a double-click.
 - **Context Menu**: Copy, paste,clear and reset functionalities through the right click menu.
 - **Password Handling:** Supports sudo commands with interactive password input.
-- **No history: Command history functionalities are not added. This enhances security. This may change in the future releases.
+- **No history:** Command history functionalities are not added. This enhances security. This may change in the future releases.
+
+
 ## Supported Commands
 
 The terminal application supports a variety of commands for interacting with the system and performing basic terminal operations. Below is a list of commands that are supported:
