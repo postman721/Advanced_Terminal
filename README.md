@@ -14,7 +14,7 @@ Table of Contents
 -    Command History: Navigate through previously entered commands using the up and down arrow keys.
 -    Customizable Appearance: Adjust font sizes and enjoy a unified dark theme.
 -    Context Menu: Right-click to access copy, paste, clear, reset, and font size options.
--    Supports Basic Shell Commands: Execute standard shell commands like cd, ls, grep, etc.
+-    Supports Basic Shell Commands: Execute standard shell commands like cd, ls, grep, sudo etc.
 
 ### Prerequisites
 
