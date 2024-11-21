@@ -31,6 +31,8 @@ sudo apt install python3-pyqt5
 
 Run the application using Python:
 
+chmod +x advanced_terminal.py
+
 python advanced_terminal.py
 
 ### Terminal Commands
