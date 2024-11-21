@@ -33,7 +33,7 @@ Run the application using Python:
 
 chmod +x advanced_terminal.py
 
-python advanced_terminal.py
+python3 advanced_terminal.py
 
 ### Terminal Commands
 
