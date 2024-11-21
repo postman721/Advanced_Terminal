@@ -3,6 +3,8 @@
 A feature-rich terminal emulator built with PyQt5, offering multiple tabbed sessions and an embedded nano-like text editor.
 Table of Contents
 
+![screen](https://github.com/user-attachments/assets/8048afbb-235a-4e05-8d0a-8519f546a38e)
+
 
 ### Features
 
