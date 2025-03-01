@@ -1,5 +1,6 @@
 # License: This project is licensed under the Apache 2.0.
 # Author: JJ Posti - techtimejourney.net - 2024
+
 import sys
 import os
 import subprocess
@@ -8,7 +9,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QWidget, QPlainTextEdit,
     QMenu, QAction, QTabWidget, QTabBar, QInputDialog, QLineEdit, QTextEdit, QPushButton, QHBoxLayout, QLabel, QStackedLayout
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QEvent
+from PyQt5.QtCore import Qt, QEvent, pyqtSignal
 from PyQt5.QtGui import QTextCharFormat, QSyntaxHighlighter, QTextCursor, QColor, QFont
 
 # Unified color scheme
@@ -34,6 +35,7 @@ class CommandSyntaxHighlighter(QSyntaxHighlighter):
         for keyword in keywords:
             index = text.find(keyword)
             while index >= 0:
+                # Ensure the keyword is standalone
                 if (index == 0 or not text[index - 1].isalnum()) and \
                    (index + len(keyword) == len(text) or not text[index + len(keyword)].isalnum()):
                     self.setFormat(index, len(keyword), self.keyword_format)
@@ -46,7 +48,7 @@ class CommandSyntaxHighlighter(QSyntaxHighlighter):
                 index = text.find(path, index + len(path))
 
 class CustomTabBar(QTabBar):
-    doubleClickTab = pyqtSignal(int)
+    doubleClickTab = pyqtSignal(int)  # Custom signal to indicate tab double-click
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -54,6 +56,7 @@ class CustomTabBar(QTabBar):
     def mouseDoubleClickEvent(self, event):
         super().mouseDoubleClickEvent(event)
         if event.button() == Qt.LeftButton:
+            # Double-click detected, emit the custom signal with the current tab index
             self.doubleClickTab.emit(self.currentIndex())
 
 class EditorWidget(QWidget):
@@ -157,6 +160,7 @@ class EditorWidget(QWidget):
         self.close()
 
 class TerminalWidget(QPlainTextEdit):
+    # Define custom signals
     outputWritten = pyqtSignal(str)
     commandFinished = pyqtSignal()
     promptUpdated = pyqtSignal(str)
@@ -168,13 +172,20 @@ class TerminalWidget(QPlainTextEdit):
         self.updatePrompt()
         self.initUI()
 
+        # Command history within session
+        self.command_history = []
+        self.history_index = -1
+
+        # Editor state
         self.in_editor = False
 
+        # Connect signals to slots
         self.outputWritten.connect(self.appendPlainText)
         self.commandFinished.connect(self.onCommandFinished)
         self.promptUpdated.connect(self.updatePromptDisplay)
 
     def updatePrompt(self):
+        """Update the prompt with the current directory."""
         try:
             username = os.getlogin()
         except OSError:
@@ -197,7 +208,6 @@ class TerminalWidget(QPlainTextEdit):
         self.setFont(QFont("Consolas", 14))
         self.setReadOnly(False)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        self.appendPlainText(f"# Welcome to terminal!\n# Use 'text <filename>' to open the editor.\n")
         self.appendPlainText(self.prompt)
         self.moveCursorToEnd()
         self.installEventFilter(self)
@@ -220,10 +230,10 @@ class TerminalWidget(QPlainTextEdit):
                 return True
             elif event.key() == Qt.Key_Backspace:
                 if cursor.positionInBlock() <= len(self.prompt):
-                    return True
+                    return True  # Prevent backspacing beyond the prompt
             elif event.key() == Qt.Key_Left:
                 if cursor.positionInBlock() <= len(self.prompt):
-                    return True
+                    return True  # Prevent moving cursor left beyond the prompt
             elif event.key() == Qt.Key_Home:
                 cursor.movePosition(QTextCursor.StartOfLine)
                 cursor.movePosition(QTextCursor.Right, QTextCursor.MoveAnchor, len(self.prompt))
@@ -243,38 +253,59 @@ class TerminalWidget(QPlainTextEdit):
         text_cursor.movePosition(text_cursor.EndOfLine, QTextCursor.KeepAnchor)
         command = text_cursor.selectedText()[len(self.prompt):].strip()
 
-        if command:
-            if command == "exit":
-                self.runCommand(command)
-            elif command == "clear":
-                self.clear()
+        if not command:
+            self.appendPlainText(self.prompt)
+            self.moveCursorToEnd()
+            return
+
+        # Add command to history
+        self.command_history.append(command)
+        self.history_index = -1  # Reset history index
+
+        if command == "exit":
+            self.runCommand(command)
+        elif command == "clear":
+            self.clear()
+            self.updatePromptDisplay(self.prompt)
+            self.moveCursorToEnd()
+        elif command == "reset":
+            self.resetTerminal()
+        elif command.startswith("cd "):
+            try:
+                new_dir = command.split(' ', 1)[1]
+                os.chdir(new_dir)
+                self.cwd = os.getcwd()
+            except Exception as e:
+                self.outputWritten.emit(f"Error: {str(e)}\n")
+            self.updatePrompt()
+            self.appendPlainText(self.prompt)
+            self.moveCursorToEnd()
+        elif command.startswith("text"):
+            # Extract filename
+            parts = command.split(maxsplit=1)
+            if len(parts) == 2:
+                filename = parts[1]
+                self.runText(filename)
+            else:
+                self.outputWritten.emit("Usage: text <filename>\n")
                 self.updatePromptDisplay(self.prompt)
                 self.moveCursorToEnd()
-            elif command == "reset":
-                self.resetTerminal()
-            elif command.startswith("cd "):
-                try:
-                    new_dir = command.split(' ', 1)[1]
-                    os.chdir(new_dir)
-                    self.cwd = os.getcwd()
-                except Exception as e:
-                    self.outputWritten.emit(f"Error: {str(e)}\n")
-                self.updatePrompt()
-                self.appendPlainText(self.prompt)
-                self.moveCursorToEnd()
-            elif command.startswith("text"):
-                parts = command.split(maxsplit=1)
-                if len(parts) == 2:
-                    filename = parts[1]
-                    self.runText(filename)
-                else:
-                    self.outputWritten.emit("Usage: text <filename>\n")
+        else:
+            if command.startswith("sudo "):
+                # Request password in main thread
+                password, ok = QInputDialog.getText(self, "Password Required", "Enter your password:", echo=QLineEdit.Password)
+                if not ok or not password:
+                    self.outputWritten.emit("Password input canceled.\n")
                     self.updatePromptDisplay(self.prompt)
                     self.moveCursorToEnd()
+                    return
+                # Pass the password to the worker thread
+                threading.Thread(target=self.runCommand, args=(command, password), daemon=True).start()
             else:
                 threading.Thread(target=self.runCommand, args=(command,), daemon=True).start()
 
     def runText(self, filename):
+        """Handle the text command by opening the embedded editor."""
         self.in_editor = True
         self.outputWritten.emit("")  # Move to new line
 
@@ -282,13 +313,15 @@ class TerminalWidget(QPlainTextEdit):
         self.parentWidget().openEditor(filename, self.onEditorClosed)
 
     def onEditorClosed(self, message):
+        """Callback when the editor is closed."""
         self.outputWritten.emit(message)
         self.updatePromptDisplay(self.prompt)
         self.moveCursorToEnd()
         self.in_editor = False
         self.commandFinished.emit()
 
-    def runCommand(self, command):
+    def runCommand(self, command, password=None):
+        # Emit the command being executed
         self.outputWritten.emit(f"\n{self.prompt}{command}\n")
 
         if command == "exit":
@@ -308,16 +341,37 @@ class TerminalWidget(QPlainTextEdit):
             self.commandFinished.emit()
             return
 
+        # Handle interactive commands
+        interactive_commands = ["vi", "vim", "top", "htop", "less", "more", "man", "ssh", "ftp"]
+        cmd_list = command.split()
+        if cmd_list[0] in interactive_commands or command.endswith('| less') or command.endswith('| more'):
+            self.outputWritten.emit(f"Interactive command '{cmd_list[0]}' is not supported internally.\n")
+            self.promptUpdated.emit(self.prompt)
+            self.commandFinished.emit()
+            return
+
+        # Run other commands
         try:
-            process = subprocess.Popen(
-                ['/bin/bash', '-c', command],
-                cwd=self.cwd,
-                text=True,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            stdout, stderr = process.communicate()
+            if command.startswith("sudo ") and password:
+                process = subprocess.Popen(
+                    ['sudo', '-S', '/bin/bash', '-c', command[5:]],
+                    cwd=self.cwd,
+                    text=True,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                stdout, stderr = process.communicate(input=f"{password}\n")
+            else:
+                process = subprocess.Popen(
+                    ['/bin/bash', '-c', command],
+                    cwd=self.cwd,
+                    text=True,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                stdout, stderr = process.communicate()
 
             if stdout:
                 self.outputWritten.emit(stdout)
@@ -336,6 +390,15 @@ class TerminalWidget(QPlainTextEdit):
 
     def updatePromptDisplay(self, prompt):
         self.updatePrompt()
+        # Move cursor to the end before appending
+        self.moveCursorToEnd()
+
+    def resetTerminal(self):
+        """Reset the terminal to its initial state."""
+        self.clear()
+        self.cwd = os.getcwd()  # Reset to the current working directory
+        self.updatePrompt()
+        self.appendPlainText(self.prompt)
         self.moveCursorToEnd()
 
     def showContextMenu(self, point):
@@ -355,6 +418,7 @@ class TerminalWidget(QPlainTextEdit):
         clear_action = QAction("Clear", self)
         reset_action = QAction("Reset", self)
 
+
         copy_action.triggered.connect(self.copy)
         paste_action.triggered.connect(self.paste)
         clear_action.triggered.connect(self.clear)
@@ -369,10 +433,23 @@ class TerminalWidget(QPlainTextEdit):
         menu.exec_(self.mapToGlobal(point))
 
     def showPreviousCommand(self):
-        pass
+        if self.command_history:
+            if self.history_index == -1:
+                self.history_index = len(self.command_history) - 1
+            elif self.history_index > 0:
+                self.history_index -= 1
+            command = self.command_history[self.history_index]
+            self.replaceCurrentLine(command)
 
     def showNextCommand(self):
-        pass
+        if self.command_history and self.history_index != -1:
+            if self.history_index < len(self.command_history) - 1:
+                self.history_index += 1
+                command = self.command_history[self.history_index]
+            else:
+                self.history_index = -1
+                command = ''
+            self.replaceCurrentLine(command)
 
     def replaceCurrentLine(self, text):
         cursor = self.textCursor()
@@ -383,6 +460,7 @@ class TerminalWidget(QPlainTextEdit):
         self.setTextCursor(cursor)
 
 class TabContentWidget(QWidget):
+    """Custom widget to hold terminal and editor, switching between them."""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.stack = QStackedLayout(self)
@@ -402,11 +480,14 @@ class TabContentWidget(QWidget):
     def closeEditor(self):
         if self.editor:
             self.stack.setCurrentWidget(self.terminal)
+            # Optionally, you can delete the editor if you don't plan to reuse it
+            # self.editor.deleteLater()
+            # self.editor = None
 
 class TerminalTabWidget(QTabWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setTabBar(CustomTabBar(self))
+        self.setTabBar(CustomTabBar(self))  # Use custom tab bar
         self.setTabsClosable(True)
         self.setMovable(True)
         self.tabCloseRequested.connect(self.closeTab)
@@ -430,8 +511,9 @@ class TerminalTabWidget(QTabWidget):
         self.tabBar().doubleClickTab.connect(self.addNewTab)
 
     def addNewTab(self):
+        """This method is used to create and add a new terminal tab."""
         tab_content = TabContentWidget(self)
-        super().addTab(tab_content, f"Session {self.count() + 1}")
+        super().addTab(tab_content, f"Session {self.count() + 1}")  # Call the parent class's addTab() method
         self.setCurrentWidget(tab_content)
 
     def closeTab(self, index):
@@ -451,6 +533,7 @@ class MainWindow(QMainWindow):
         self.terminal_tabs = TerminalTabWidget(self)
         self.layout.addWidget(self.terminal_tabs)
 
+        # Apply dark background color to the main window
         self.setStyleSheet(f"""
             background-color: {BACKGROUND_COLOR};
             color: {TEXT_COLOR};
