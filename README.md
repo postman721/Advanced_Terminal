@@ -25,7 +25,9 @@ Table of Contents
 
 sudo apt update
 
-sudo apt install python3-pyqt5
+sudo apt install python3-pyqt5      - For pyqt5
+
+sudo apt install python3-pyqt6      - For pyqt6
 
 ### Usage
 
