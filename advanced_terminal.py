@@ -1,22 +1,94 @@
 # License: This project is licensed under the Apache 2.0.
 # Author: JJ Posti - techtimejourney.net - 2024
+# This is pyqt5/6 version released on January 2026
 
 import sys
 import os
 import subprocess
 import threading
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QWidget, QPlainTextEdit,
-    QMenu, QAction, QTabWidget, QTabBar, QInputDialog, QLineEdit, QTextEdit, QPushButton, QHBoxLayout, QLabel, QStackedLayout
-)
-from PyQt5.QtCore import Qt, QEvent, pyqtSignal
-from PyQt5.QtGui import QTextCharFormat, QSyntaxHighlighter, QTextCursor, QColor, QFont
+sys.dont_write_bytecode = True
+
+# ---- Qt compatibility layer (PyQt6 preferred, falls back to PyQt5) ----
+IS_QT6 = False
+
+try:
+    from PyQt6.QtWidgets import (
+        QApplication, QMainWindow, QVBoxLayout, QWidget, QPlainTextEdit,
+        QMenu, QTabWidget, QTabBar, QInputDialog, QLineEdit, QTextEdit,
+        QPushButton, QHBoxLayout, QLabel, QStackedLayout
+    )
+    from PyQt6.QtCore import Qt, QEvent, pyqtSignal, QT_VERSION_STR, PYQT_VERSION_STR
+    from PyQt6.QtGui import (
+        QTextCharFormat, QSyntaxHighlighter, QTextCursor, QColor, QFont, QAction
+    )
+    IS_QT6 = True
+except ImportError:  # pragma: no cover
+    from PyQt5.QtWidgets import (
+        QApplication, QMainWindow, QVBoxLayout, QWidget, QPlainTextEdit,
+        QMenu, QAction, QTabWidget, QTabBar, QInputDialog, QLineEdit, QTextEdit,
+        QPushButton, QHBoxLayout, QLabel, QStackedLayout
+    )
+    from PyQt5.QtCore import Qt, QEvent, pyqtSignal, QT_VERSION_STR, PYQT_VERSION_STR
+    from PyQt5.QtGui import QTextCharFormat, QSyntaxHighlighter, QTextCursor, QColor, QFont
+
+# ---- Enum shims for Qt5/Qt6 differences ----
+if IS_QT6:
+    # Keys / buttons
+    KEY_RETURN = Qt.Key.Key_Return
+    KEY_ENTER = Qt.Key.Key_Enter
+    KEY_BACKSPACE = Qt.Key.Key_Backspace
+    KEY_LEFT = Qt.Key.Key_Left
+    KEY_HOME = Qt.Key.Key_Home
+    KEY_UP = Qt.Key.Key_Up
+    KEY_DOWN = Qt.Key.Key_Down
+    MOUSE_LEFT = Qt.MouseButton.LeftButton
+
+    # Policies / event types
+    SCROLLBAR_ALWAYS_ON = Qt.ScrollBarPolicy.ScrollBarAlwaysOn
+    CONTEXT_MENU_CUSTOM = Qt.ContextMenuPolicy.CustomContextMenu
+    EVENT_KEYPRESS = QEvent.Type.KeyPress
+
+    # QTextCursor enums
+    CURSOR_END = QTextCursor.MoveOperation.End
+    CURSOR_START_OF_LINE = QTextCursor.MoveOperation.StartOfLine
+    CURSOR_END_OF_LINE = QTextCursor.MoveOperation.EndOfLine
+    CURSOR_RIGHT = QTextCursor.MoveOperation.Right
+    CURSOR_MOVE_ANCHOR = QTextCursor.MoveMode.MoveAnchor
+    CURSOR_KEEP_ANCHOR = QTextCursor.MoveMode.KeepAnchor
+else:  # PyQt5
+    KEY_RETURN = Qt.Key_Return
+    KEY_ENTER = Qt.Key_Enter
+    KEY_BACKSPACE = Qt.Key_Backspace
+    KEY_LEFT = Qt.Key_Left
+    KEY_HOME = Qt.Key_Home
+    KEY_UP = Qt.Key_Up
+    KEY_DOWN = Qt.Key_Down
+    MOUSE_LEFT = Qt.LeftButton
+
+    SCROLLBAR_ALWAYS_ON = Qt.ScrollBarAlwaysOn
+    CONTEXT_MENU_CUSTOM = Qt.CustomContextMenu
+    EVENT_KEYPRESS = QEvent.KeyPress
+
+    CURSOR_END = QTextCursor.End
+    CURSOR_START_OF_LINE = QTextCursor.StartOfLine
+    CURSOR_END_OF_LINE = QTextCursor.EndOfLine
+    CURSOR_RIGHT = QTextCursor.Right
+    CURSOR_MOVE_ANCHOR = QTextCursor.MoveAnchor
+    CURSOR_KEEP_ANCHOR = QTextCursor.KeepAnchor
+
 
 # Unified color scheme
+
+# Report which Qt binding/version is in use
+QT_API_NAME = "PyQt6" if IS_QT6 else "PyQt5"
+QT_VERSION = QT_VERSION_STR
+PYQT_VERSION = PYQT_VERSION_STR
+
 BACKGROUND_COLOR = "#1e1e1e"  # Darker gray for background
 TEXT_COLOR = "#e0e0e0"        # Slightly darker white for text
 TAB_BACKGROUND_COLOR = "#2a2a2a"  # Dark gray for inactive tabs
 TAB_SELECTED_COLOR = "#1a1a1a"    # Darker gray for selected tab
+
 
 class CommandSyntaxHighlighter(QSyntaxHighlighter):
     def __init__(self, document):
@@ -36,8 +108,7 @@ class CommandSyntaxHighlighter(QSyntaxHighlighter):
             index = text.find(keyword)
             while index >= 0:
                 # Ensure the keyword is standalone
-                if (index == 0 or not text[index - 1].isalnum()) and \
-                   (index + len(keyword) == len(text) or not text[index + len(keyword)].isalnum()):
+                if (index == 0 or not text[index - 1].isalnum()) and                    (index + len(keyword) == len(text) or not text[index + len(keyword)].isalnum()):
                     self.setFormat(index, len(keyword), self.keyword_format)
                 index = text.find(keyword, index + len(keyword))
 
@@ -47,6 +118,7 @@ class CommandSyntaxHighlighter(QSyntaxHighlighter):
                 self.setFormat(index, len(path), self.path_format)
                 index = text.find(path, index + len(path))
 
+
 class CustomTabBar(QTabBar):
     doubleClickTab = pyqtSignal(int)  # Custom signal to indicate tab double-click
 
@@ -55,9 +127,10 @@ class CustomTabBar(QTabBar):
 
     def mouseDoubleClickEvent(self, event):
         super().mouseDoubleClickEvent(event)
-        if event.button() == Qt.LeftButton:
+        if event.button() == MOUSE_LEFT:
             # Double-click detected, emit the custom signal with the current tab index
             self.doubleClickTab.emit(self.currentIndex())
+
 
 class EditorWidget(QWidget):
     """A simple nano-like text editor embedded within the terminal application."""
@@ -89,8 +162,8 @@ class EditorWidget(QWidget):
         # Buttons for Save and Exit
         button_layout = QHBoxLayout()
         self.save_button = QPushButton("Save")
-        self.save_button.setStyleSheet(f"""
-            QPushButton {{
+        self.save_button.setStyleSheet("""
+            QPushButton {
                 background-color: #4CAF50;
                 color: white;
                 border: none;
@@ -100,14 +173,14 @@ class EditorWidget(QWidget):
                 font-size: 14px;
                 margin: 4px 2px;
                 cursor: pointer;
-            }}
-            QPushButton:hover {{
+            }
+            QPushButton:hover {
                 background-color: #45a049;
-            }}
+            }
         """)
         self.exit_button = QPushButton("Exit")
-        self.exit_button.setStyleSheet(f"""
-            QPushButton {{
+        self.exit_button.setStyleSheet("""
+            QPushButton {
                 background-color: #f44336;
                 color: white;
                 border: none;
@@ -117,10 +190,10 @@ class EditorWidget(QWidget):
                 font-size: 14px;
                 margin: 4px 2px;
                 cursor: pointer;
-            }}
-            QPushButton:hover {{
+            }
+            QPushButton:hover {
                 background-color: #da190b;
-            }}
+            }
         """)
         button_layout.addWidget(self.save_button)
         button_layout.addWidget(self.exit_button)
@@ -135,19 +208,19 @@ class EditorWidget(QWidget):
 
     def load_file(self):
         try:
-            with open(self.file_path, 'r') as f:
+            with open(self.file_path, 'r', encoding="utf-8", errors="replace") as f:
                 content = f.read()
                 self.text_edit.setPlainText(content)
         except FileNotFoundError:
             # If file doesn't exist, create it
-            open(self.file_path, 'a').close()
+            open(self.file_path, 'a', encoding="utf-8").close()
             self.text_edit.setPlainText("")
         except Exception as e:
             self.text_edit.setPlainText(f"Error loading file: {e}")
 
     def save_file(self):
         try:
-            with open(self.file_path, 'w') as f:
+            with open(self.file_path, 'w', encoding="utf-8") as f:
                 content = self.text_edit.toPlainText()
                 f.write(content)
             self.on_close_callback("File saved successfully.\n")
@@ -159,6 +232,7 @@ class EditorWidget(QWidget):
         self.parentWidget().closeEditor()
         self.close()
 
+
 class TerminalWidget(QPlainTextEdit):
     # Define custom signals
     outputWritten = pyqtSignal(str)
@@ -167,17 +241,17 @@ class TerminalWidget(QPlainTextEdit):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+
+        # State that can be referenced by the event filter must exist
+        # *before* we install the event filter (done in initUI()).
         self.cwd = os.getcwd()
+        self.command_history = []
+        self.history_index = -1
+        self.in_editor = False
+
         self.highlighter = CommandSyntaxHighlighter(self.document())
         self.updatePrompt()
         self.initUI()
-
-        # Command history within session
-        self.command_history = []
-        self.history_index = -1
-
-        # Editor state
-        self.in_editor = False
 
         # Connect signals to slots
         self.outputWritten.connect(self.appendPlainText)
@@ -207,50 +281,50 @@ class TerminalWidget(QPlainTextEdit):
         """)
         self.setFont(QFont("Consolas", 14))
         self.setReadOnly(False)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.setVerticalScrollBarPolicy(SCROLLBAR_ALWAYS_ON)
         self.appendPlainText(self.prompt)
         self.moveCursorToEnd()
         self.installEventFilter(self)
-        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.setContextMenuPolicy(CONTEXT_MENU_CUSTOM)
         self.customContextMenuRequested.connect(self.showContextMenu)
 
     def moveCursorToEnd(self):
         cursor = self.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(CURSOR_END)
         self.setTextCursor(cursor)
 
     def eventFilter(self, source, event):
-        if self.in_editor:
+        if getattr(self, "in_editor", False):
             return super().eventFilter(source, event)
 
-        if source is self and event.type() == QEvent.KeyPress:
+        if source is self and event.type() == EVENT_KEYPRESS:
             cursor = self.textCursor()
-            if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            if event.key() in (KEY_RETURN, KEY_ENTER):
                 self.executeCommand()
                 return True
-            elif event.key() == Qt.Key_Backspace:
+            elif event.key() == KEY_BACKSPACE:
                 if cursor.positionInBlock() <= len(self.prompt):
                     return True  # Prevent backspacing beyond the prompt
-            elif event.key() == Qt.Key_Left:
+            elif event.key() == KEY_LEFT:
                 if cursor.positionInBlock() <= len(self.prompt):
                     return True  # Prevent moving cursor left beyond the prompt
-            elif event.key() == Qt.Key_Home:
-                cursor.movePosition(QTextCursor.StartOfLine)
-                cursor.movePosition(QTextCursor.Right, QTextCursor.MoveAnchor, len(self.prompt))
+            elif event.key() == KEY_HOME:
+                cursor.movePosition(CURSOR_START_OF_LINE)
+                cursor.movePosition(CURSOR_RIGHT, CURSOR_MOVE_ANCHOR, len(self.prompt))
                 self.setTextCursor(cursor)
                 return True
-            elif event.key() == Qt.Key_Up:
+            elif event.key() == KEY_UP:
                 self.showPreviousCommand()
                 return True
-            elif event.key() == Qt.Key_Down:
+            elif event.key() == KEY_DOWN:
                 self.showNextCommand()
                 return True
         return super().eventFilter(source, event)
 
     def executeCommand(self):
         text_cursor = self.textCursor()
-        text_cursor.movePosition(text_cursor.StartOfLine)
-        text_cursor.movePosition(text_cursor.EndOfLine, QTextCursor.KeepAnchor)
+        text_cursor.movePosition(CURSOR_START_OF_LINE)
+        text_cursor.movePosition(CURSOR_END_OF_LINE, CURSOR_KEEP_ANCHOR)
         command = text_cursor.selectedText()[len(self.prompt):].strip()
 
         if not command:
@@ -293,7 +367,10 @@ class TerminalWidget(QPlainTextEdit):
         else:
             if command.startswith("sudo "):
                 # Request password in main thread
-                password, ok = QInputDialog.getText(self, "Password Required", "Enter your password:", echo=QLineEdit.Password)
+                password, ok = QInputDialog.getText(
+                    self, "Password Required", "Enter your password:",
+                    echo=QLineEdit.EchoMode.Password if IS_QT6 else QLineEdit.Password
+                )
                 if not ok or not password:
                     self.outputWritten.emit("Password input canceled.\n")
                     self.updatePromptDisplay(self.prompt)
@@ -344,7 +421,7 @@ class TerminalWidget(QPlainTextEdit):
         # Handle interactive commands
         interactive_commands = ["vi", "vim", "top", "htop", "less", "more", "man", "ssh", "ftp"]
         cmd_list = command.split()
-        if cmd_list[0] in interactive_commands or command.endswith('| less') or command.endswith('| more'):
+        if cmd_list and (cmd_list[0] in interactive_commands or command.endswith('| less') or command.endswith('| more')):
             self.outputWritten.emit(f"Interactive command '{cmd_list[0]}' is not supported internally.\n")
             self.promptUpdated.emit(self.prompt)
             self.commandFinished.emit()
@@ -418,7 +495,6 @@ class TerminalWidget(QPlainTextEdit):
         clear_action = QAction("Clear", self)
         reset_action = QAction("Reset", self)
 
-
         copy_action.triggered.connect(self.copy)
         paste_action.triggered.connect(self.paste)
         clear_action.triggered.connect(self.clear)
@@ -430,7 +506,11 @@ class TerminalWidget(QPlainTextEdit):
         menu.addAction(reset_action)
         menu.addSeparator()
 
-        menu.exec_(self.mapToGlobal(point))
+        global_pos = self.mapToGlobal(point)
+        if hasattr(menu, "exec"):
+            menu.exec(global_pos)  # PyQt6
+        else:  # pragma: no cover
+            menu.exec_(global_pos)  # PyQt5
 
     def showPreviousCommand(self):
         if self.command_history:
@@ -453,11 +533,12 @@ class TerminalWidget(QPlainTextEdit):
 
     def replaceCurrentLine(self, text):
         cursor = self.textCursor()
-        cursor.movePosition(QTextCursor.StartOfLine)
-        cursor.movePosition(QTextCursor.EndOfLine, QTextCursor.KeepAnchor)
+        cursor.movePosition(CURSOR_START_OF_LINE)
+        cursor.movePosition(CURSOR_END_OF_LINE, CURSOR_KEEP_ANCHOR)
         cursor.removeSelectedText()
         cursor.insertText(self.prompt + text)
         self.setTextCursor(cursor)
+
 
 class TabContentWidget(QWidget):
     """Custom widget to hold terminal and editor, switching between them."""
@@ -474,6 +555,7 @@ class TabContentWidget(QWidget):
             self.stack.addWidget(self.editor)
         else:
             self.editor.file_path = filename
+            self.editor.label.setText(f"Editing: {self.editor.file_path}")
             self.editor.load_file()
         self.stack.setCurrentWidget(self.editor)
 
@@ -481,8 +563,9 @@ class TabContentWidget(QWidget):
         if self.editor:
             self.stack.setCurrentWidget(self.terminal)
             # Optionally, you can delete the editor if you don't plan to reuse it
-            # self.editor.deleteLater()
-            # self.editor = None
+            self.editor.deleteLater()
+            self.editor = None
+
 
 class TerminalTabWidget(QTabWidget):
     def __init__(self, parent=None):
@@ -510,16 +593,17 @@ class TerminalTabWidget(QTabWidget):
         self.addNewTab()
         self.tabBar().doubleClickTab.connect(self.addNewTab)
 
-    def addNewTab(self):
+    def addNewTab(self, *_):
         """This method is used to create and add a new terminal tab."""
         tab_content = TabContentWidget(self)
-        super().addTab(tab_content, f"Session {self.count() + 1}")  # Call the parent class's addTab() method
+        super().addTab(tab_content, f"Session {self.count() + 1}")
         self.setCurrentWidget(tab_content)
 
     def closeTab(self, index):
         if self.count() > 1:
             self.widget(index).deleteLater()
             self.removeTab(index)
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -539,8 +623,17 @@ class MainWindow(QMainWindow):
             color: {TEXT_COLOR};
         """)
 
+
+def _exec_app(app: QApplication) -> int:
+    """Run the Qt event loop in a version-neutral way."""
+    if hasattr(app, "exec"):
+        return app.exec()  # PyQt6 (and PyQt5 >= 5.15)
+    return app.exec_()  # pragma: no cover
+
+
 if __name__ == "__main__":
+    print(f"Using {QT_API_NAME} (PyQt {PYQT_VERSION}, Qt {QT_VERSION})")
     app = QApplication(sys.argv)
     main_window = MainWindow()
     main_window.show()
-    sys.exit(app.exec_())
+    sys.exit(_exec_app(app))
