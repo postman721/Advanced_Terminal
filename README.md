@@ -19,7 +19,7 @@ Table of Contents
 ### Prerequisites
 
     Python 3.6 or higher
-    PyQt5
+    PyQt5 OR PyQt6
 
 ### Installation
 
